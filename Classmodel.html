@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FakeShield — Static Analysis · Domain Model</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Fira+Code:wght@300;400;500&family=Nunito:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f0f4f8;
+  --paper: #ffffff;
+  --ink: #0d1b2a;
+  --ink2: #1e3a5f;
+  --ink3: #4a6080;
+  --ink4: #8fa3bc;
+  --rule: #d0dbe8;
+  --rule2: #e8eef5;
+  --accent: #1e3a5f;
+
+  /* Entity category colors */
+  --human-h: #7c3a0e;   --human-b: #fffbeb;   --human-br: #d97706;
+  --core-h: #1e3a5f;    --core-b: #eff6ff;    --core-br: #3b82f6;
+  --detect-h: #115e59;  --detect-b: #f0fdfa;  --detect-br: #14b8a6;
+  --plat-h: #334155;    --plat-b: #f8fafc;    --plat-br: #64748b;
+  --evid-h: #4c1d95;    --evid-b: #f5f3ff;    --evid-br: #7c3aed;
+  --comms-h: #7f1d1d;   --comms-b: #fff1f2;   --comms-br: #e11d48;
+
+  --font-display: 'Cormorant Garamond', serif;
+  --font-mono: 'Fira Code', monospace;
+  --font-body: 'Nunito', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--ink);
+  min-height: 100vh;
+}
+
+/* Fine dot-grid background */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image: radial-gradient(circle, #b8cce0 1px, transparent 1px);
+  background-size: 24px 24px;
+  pointer-events: none; z-index: 0; opacity: 0.45;
+}
+
+.wrap { position: relative; z-index: 1; max-width: 1400px; margin: 0 auto; padding: 36px 28px 80px; }
+
+/* ── Document Header ── */
+.doc-header {
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-top: 4px solid var(--ink2);
+  border-radius: 4px;
+  padding: 32px 40px 26px;
+  margin-bottom: 28px;
+  box-shadow: 0 2px 12px rgba(30,58,95,0.08);
+  display: flex; align-items: flex-start; gap: 40px;
+}
+
+.doc-badge {
+  flex-shrink: 0;
+  width: 64px; height: 64px;
+  background: var(--ink2);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px;
+}
+
+.doc-info { flex: 1; }
+
+.doc-docid {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink4);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.doc-title {
+  font-family: var(--font-display);
+  font-size: 38px;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.1;
+  letter-spacing: -0.5px;
+}
+
+.doc-title em { font-style: italic; color: var(--ink2); }
+
+.doc-subtitle {
+  font-size: 13px;
+  color: var(--ink3);
+  margin-top: 6px;
+  font-weight: 500;
+}
+
+.doc-meta {
+  display: flex; flex-wrap: wrap; gap: 24px;
+  margin-top: 20px; padding-top: 16px;
+  border-top: 1px solid var(--rule2);
+}
+
+.meta-chip {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  background: var(--bg);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 5px 10px;
+  color: var(--ink3);
+}
+
+.meta-chip strong { color: var(--ink2); }
+
+/* ── Section ── */
+.section {
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 6px rgba(30,58,95,0.05);
+  overflow: hidden;
+}
+
+.section-hdr {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 24px;
+  background: linear-gradient(90deg, #f8fafc 0%, var(--paper) 100%);
+  border-bottom: 1px solid var(--rule2);
+  cursor: pointer;
+  user-select: none;
+}
+
+.sec-id {
+  font-family: var(--font-mono);
+  font-size: 9px; font-weight: 500;
+  color: var(--paper);
+  background: var(--ink2);
+  padding: 3px 8px;
+  border-radius: 3px;
+  letter-spacing: 1px;
+}
+
+.sec-title {
+  font-family: var(--font-display);
+  font-size: 21px; font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.3px;
+}
+
+.sec-toggle { margin-left: auto; color: var(--ink4); font-size: 14px; transition: transform 0.2s; }
+.section.closed .sec-toggle { transform: rotate(-90deg); }
+.section.closed .sec-body { display: none; }
+.sec-body { padding: 0; }
+
+/* ── Entity + Relationship Tables ── */
+.cat-table { width: 100%; border-collapse: collapse; }
+.cat-table th {
+  padding: 10px 16px;
+  background: var(--bg);
+  font-family: var(--font-mono);
+  font-size: 9px; font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--ink3);
+  text-align: left;
+  border-bottom: 2px solid var(--rule);
+  border-right: 1px solid var(--rule2);
+}
+.cat-table th:last-child { border-right: none; }
+.cat-table td {
+  padding: 9px 16px;
+  font-size: 12.5px;
+  border-bottom: 1px solid var(--rule2);
+  border-right: 1px solid var(--rule2);
+  color: var(--ink2);
+  vertical-align: top;
+}
+.cat-table td:last-child { border-right: none; }
+.cat-table tr:last-child td { border-bottom: none; }
+.cat-table tr:hover td { background: rgba(30,58,95,0.025); }
+
+.entity-id {
+  font-family: var(--font-mono);
+  font-size: 10px; font-weight: 600;
+  color: var(--ink2);
+  background: var(--bg);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  padding: 2px 7px;
+  display: inline-block;
+}
+
+.cat-dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.badge {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 9px; font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 3px;
+  border: 1px solid;
+  letter-spacing: 0.5px;
+  margin-right: 3px;
+}
+.badge-human { background: #fef3c7; color: #7c3a0e; border-color: #d97706; }
+.badge-core  { background: #dbeafe; color: #1e3a5f; border-color: #3b82f6; }
+.badge-detect{ background: #ccfbf1; color: #115e59; border-color: #14b8a6; }
+.badge-plat  { background: #f1f5f9; color: #334155; border-color: #64748b; }
+.badge-evid  { background: #ede9fe; color: #4c1d95; border-color: #7c3aed; }
+.badge-comms { background: #ffe4e6; color: #7f1d1d; border-color: #e11d48; }
+
+.mult-badge {
+  font-family: var(--font-mono);
+  font-size: 10px; font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--bg);
+  border: 1px solid var(--rule);
+  color: var(--ink2);
+}
+
+.rel-type {
+  font-family: var(--font-mono);
+  font-size: 9px; font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+.rel-assoc  { background: #dbeafe; color: #1e40af; }
+.rel-comp   { background: #d1fae5; color: #065f46; }
+.rel-agg    { background: #fef3c7; color: #78350f; }
+.rel-dep    { background: #f3e8ff; color: #5b21b6; }
+
+/* ── Diagram Wrapper ── */
+.diagram-scroll { overflow-x: auto; padding: 20px 0 8px; }
+.diagram-label {
+  font-family: var(--font-mono);
+  font-size: 10px; color: var(--ink4);
+  text-align: center;
+  padding: 8px 0 16px;
+  letter-spacing: 1px;
+}
+
+/* ── SVG Diagram Styles ── */
+.uml-svg { display: block; min-width: 1320px; }
+
+/* ── Legend ── */
+.legend-row {
+  display: flex; flex-wrap: wrap; gap: 16px;
+  padding: 14px 24px;
+  border-top: 1px solid var(--rule2);
+  background: var(--bg);
+}
+.legend-item {
+  display: flex; align-items: center; gap: 7px;
+  font-family: var(--font-mono); font-size: 9px;
+  color: var(--ink3);
+}
+
+/* ── Tabs for diagrams ── */
+.diagram-tabs {
+  display: flex; border-bottom: 1px solid var(--rule);
+  background: var(--bg);
+  padding: 0 20px;
+}
+.d-tab {
+  padding: 10px 20px;
+  font-family: var(--font-mono); font-size: 10px;
+  font-weight: 600; color: var(--ink4);
+  cursor: pointer; border: none; background: transparent;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px; transition: all 0.15s;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.d-tab:hover { color: var(--ink2); }
+.d-tab.active { color: var(--ink2); border-bottom-color: var(--ink2); background: var(--paper); }
+.d-panel { display: none; }
+.d-panel.active { display: block; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- ═══════════════════ DOCUMENT HEADER ═══════════════════ -->
+<div class="doc-header">
+  <div class="doc-badge">🔬</div>
+  <div class="doc-info">
+    <div class="doc-docid">SRS-SA-002 · Static Analysis · Domain Model</div>
+    <div class="doc-title">FakeShield — <em>Static Analysis</em></div>
+    <div class="doc-subtitle">Domain Entity Identification · Class Diagram (Domain Model) · Object Diagram (Snapshot Instance)</div>
+    <div class="doc-meta">
+      <div class="meta-chip"><strong>Entities</strong> 14 Domain Classes</div>
+      <div class="meta-chip"><strong>Relationships</strong> 15 Mapped</div>
+      <div class="meta-chip"><strong>Multiplicities</strong> 1:1 · 1:N · M:N</div>
+      <div class="meta-chip"><strong>Relationship Types</strong> Association · Composition · Aggregation</div>
+      <div class="meta-chip"><strong>Object Snapshot</strong> Case #CS-2024-0891</div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════ §1 DOMAIN ENTITY CATALOGUE ═══════════════════ -->
+<div class="section" id="s1">
+  <div class="section-hdr" onclick="tog('s1')">
+    <div class="sec-id">§ 1</div>
+    <div class="sec-title">Domain Entity Catalogue</div>
+    <div class="sec-toggle">▾</div>
+  </div>
+  <div class="sec-body">
+    <table class="cat-table">
+      <thead>
+        <tr>
+          <th>ID</th><th>Entity</th><th>Category</th><th>Real-World Concept</th><th>Key Attributes (sample)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="entity-id">E-01</span></td>
+          <td><strong>Citizen</strong></td>
+          <td><span class="badge badge-human">Human Actor</span></td>
+          <td>Any Indian citizen who submits a report about a suspected fake account. Has no system login; identified by mobile/email for OTP.</td>
+          <td style="font-family:var(--font-mono);font-size:11px;color:#334155">citizenId, name, mobile, email, reportCount</td>
+        </tr>
+        <tr>
+          <td><span class="entity-id">E-02</span></td>
+          <td><strong>Officer</strong></td>
+          <td><span class="badge badge-human">Human Actor</span></td>
+          <td>Authenticated agency analyst or senior officer who reviews cases, sends takedowns and generates legal reports.</td>
+          <td style="font-family:var(--font-mono);font-size:11px;color:#334155">officerId, employeeId, name, email, designation, isActive</td>
+        </tr>
+        <tr>
+          <td><span class="entity-id">E-03</span></td>
+          <td><strong>Role</strong></td>
+          <td><span class="badge badge-human">Human Actor</span></td>
+          <td>Permission profile assigned to Officers (Admin / Senior Officer / Analyst / Read-Only). Controls feature access.</td>
+          <td style="font-family:var(--font-mono);font-size:11px;color:#334155">roleId, roleName, permissions[ ]</td>
+        </tr>
+        <tr>
+          <td><span class="entity-id">E-04</span></td>
+          <td><strong>Report</strong></td>
+          <td><span class="badge badge-core">Core Domain</span></td>
+          <td>Citizen submission about a suspected fake account. Entry point into the system; generates a Case upon AI confirmation.</td>
+          <td style="font-family:var(--font-mono);font-size:11px;color:#334155">ticketNumber, platform, suspectUrl, reason, status, screenshots[ ]</td>
+        </tr>
+        <tr>
+          <td><span class="entity-id">E-05</span></td>
+          <td><strong>Case</strong></td>
+          <td><span class="badge badge-core">Core Domain</span></td>
+          <td>The central workflow entity representing one fake account investigation. Aggregates scan results, evidence, takedown requests and audit history.</td>
+          <td style="font-family:var(--font-mono);font-size:11px;color:#334155">caseNumber, priority, status, fakeScore, slaDeadline, createdAt</td>
+        </tr>
+        <tr>
+          <td><span class="entity-id">E-06</span></td>
+          <td><strong>SocialAccount</strong></td>
+          <td><span class="badge badge-detect">Detection</span></td>
+          <td>The suspected fake social media account being analysed. Stores scraped metadata used as ML features.</td>
+          <td style="font-family:var(--font-mono);font-size:11px;color:#334155">username, platformUserId, followerCount, accountAge, postCount, isVerified</td>
+        </tr>
+        <tr>
+          <td><span class="entity-id">E-07</span></td>
+          <td><strong>ScanResult</strong></td>
+          <td><span class="badge badge-detect">Detection</span></td>
+          <td>Output of the AI Detection Engine for one account. Stores composite FakeScore, per-pipeline sub-scores and SHAP explanations.</td>
+          <td style="font-family:var(--font-mono);font-size:11px;color:#334155">fakeScore, metadataScore, imageScore, nlpScore, graphScore, confidence</td>
+        </tr>
+        <tr>
+          <td><span class="entity-id">E-08</span></td>
+          <td><strong>Platform</strong></td>
+          <td><span class="badge badge-plat">Infrastructure</span></td>
+          <td>A registered social media platform (Facebook, Instagram, Twitter, YouTube). Stores API config, grievance email and compliance metrics.</td>
+          <td style="font-family:var(--font-mono);font-size:11px;color:#334155">name, apiEndpoint, grievanceEmail, slaHours, complianceRate</td>
+        </tr>
+        <tr>
+          <td><span class="entity-id">E-09</span></td>
+          <td><strong>SLAConfig</strong></td>
+          <td><span class="badge badge-plat">Infrastructure</span></td>
+          <td>SLA window rules per platform defined under IT Rules 2021 (36 hrs grievance / 72 hrs general). Controls reminder schedule.</td>
+          <td style="font-family:var(--font-mono);font-size:11px;color:#334155">grievanceHours, generalHours, reminder50pct, reminder90pct</td>
+        </tr>
+        <tr>
+          <td><span class="entity-id">E-10</span></td>
+          <td><strong>Evidence</strong></td>
+          <td><span class="badge badge-evid">Evidence &amp; Audit</span></td>
+          <td>A single piece of evidence attached to a Case (screenshot, metadata JSON, image analysis result, NLP report). Has a SHA-256 hash for integrity.</td>
+          <td style="font-family:var(--font-mono);font-size:11px;color:#334155">type, filePath, fileHash, capturedAt</td>
+        </tr>
+        <tr>
+          <td><span class="entity-id">E-11</span></td>
+          <td><strong>BlockchainRecord</strong></td>
+          <td><span class="badge badge-evid">Evidence &amp; Audit</span></td>
+          <td>An immutable Hyperledger Fabric transaction recording a case lifecycle event (EVIDENCE_LOCKED, TAKEDOWN_SENT, PLATFORM_RESPONSE, ESCALATED).</td>
+          <td style="font-family:var(--font-mono);font-size:11px;color:#334155">txId, eventType, evidenceHash, blockNumber, channelName, timestamp</td>
+        </tr>
+        <tr>
+          <td><span class="entity-id">E-12</span></td>
+          <td><strong>TakedownRequest</strong></td>
+          <td><span class="badge badge-comms">Communication</span></td>
+          <td>A formal delete/suspend request sent by the agency to a social media platform. Tracked for SLA compliance; linked to blockchain record.</td>
+          <td style="font-family:var(--font-mono);font-size:11px;color:#334155">requestNumber, requestedAction, status, sentAt, slaDeadline, reminderCount</td>
+        </tr>
+        <tr>
+          <td><span class="entity-id">E-13</span></td>
+          <td><strong>Notification</strong></td>
+          <td><span class="badge badge-comms">Communication</span></td>
+          <td>System-generated message to Citizens (status updates), Platforms (SLA reminders), or Officers (alerts). Sent via email/SMS/in-app.</td>
+          <td style="font-family:var(--font-mono);font-size:11px;color:#334155">type, channel, recipient, message, sentAt, isDelivered</td>
+        </tr>
+        <tr>
+          <td><span class="entity-id">E-14</span></td>
+          <td><strong>LegalReport</strong></td>
+          <td><span class="badge badge-comms">Communication</span></td>
+          <td>A court-admissible PDF dossier generated for escalated cases. Contains the full case timeline, evidence hashes, blockchain TX IDs and digital signature.</td>
+          <td style="font-family:var(--font-mono);font-size:11px;color:#334155">reportNumber, digitalSignature, blockchainTxId, applicableSections[ ]</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+
+<!-- ═══════════════════ §2 RELATIONSHIP CATALOGUE ═══════════════════ -->
+<div class="section" id="s2">
+  <div class="section-hdr" onclick="tog('s2')">
+    <div class="sec-id">§ 2</div>
+    <div class="sec-title">Relationship Catalogue</div>
+    <div class="sec-toggle">▾</div>
+  </div>
+  <div class="sec-body">
+    <table class="cat-table">
+      <thead>
+        <tr><th>#</th><th>Source Entity</th><th>Relationship</th><th>Target Entity</th><th>Multiplicity</th><th>Type</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="font-family:var(--font-mono);font-size:10px;color:var(--ink4)">R-01</td>
+          <td><span class="badge badge-human">Citizen</span></td>
+          <td style="font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--ink2)">submits</td>
+          <td><span class="badge badge-core">Report</span></td>
+          <td><span class="mult-badge">1</span> — <span class="mult-badge">N</span></td>
+          <td><span class="rel-type rel-assoc">Association</span></td>
+          <td style="font-size:11.5px;color:var(--ink3)">One citizen can submit many reports; each report is from exactly one citizen.</td>
+        </tr>
+        <tr>
+          <td style="font-family:var(--font-mono);font-size:10px;color:var(--ink4)">R-02</td>
+          <td><span class="badge badge-core">Report</span></td>
+          <td style="font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--ink2)">generates</td>
+          <td><span class="badge badge-core">Case</span></td>
+          <td><span class="mult-badge">1</span> — <span class="mult-badge">1</span></td>
+          <td><span class="rel-type rel-assoc">Association</span></td>
+          <td style="font-size:11.5px;color:var(--ink3)">Each verified report creates exactly one Case. A Case may also originate from a proactive scan (no Report).</td>
+        </tr>
+        <tr>
+          <td style="font-family:var(--font-mono);font-size:10px;color:var(--ink4)">R-03</td>
+          <td><span class="badge badge-human">Officer</span></td>
+          <td style="font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--ink2)">manages</td>
+          <td><span class="badge badge-core">Case</span></td>
+          <td><span class="mult-badge">M</span> — <span class="mult-badge">N</span></td>
+          <td><span class="rel-type rel-assoc">Association</span></td>
+          <td style="font-size:11.5px;color:var(--ink3)">An officer can manage many cases; a case can be reassigned to different officers over its lifecycle. Junction: CaseAssignment.</td>
+        </tr>
+        <tr>
+          <td style="font-family:var(--font-mono);font-size:10px;color:var(--ink4)">R-04</td>
+          <td><span class="badge badge-human">Officer</span></td>
+          <td style="font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--ink2)">assignedTo</td>
+          <td><span class="badge badge-human">Role</span></td>
+          <td><span class="mult-badge">N</span> — <span class="mult-badge">1</span></td>
+          <td><span class="rel-type rel-assoc">Association</span></td>
+          <td style="font-size:11.5px;color:var(--ink3)">Many officers share a role; each officer has exactly one role at a time.</td>
+        </tr>
+        <tr>
+          <td style="font-family:var(--font-mono);font-size:10px;color:var(--ink4)">R-05</td>
+          <td><span class="badge badge-core">Case</span></td>
+          <td style="font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--ink2)">investigates</td>
+          <td><span class="badge badge-detect">SocialAccount</span></td>
+          <td><span class="mult-badge">N</span> — <span class="mult-badge">1</span></td>
+          <td><span class="rel-type rel-
